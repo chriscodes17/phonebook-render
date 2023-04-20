@@ -1,22 +1,10 @@
 const express = require("express");
-const morgan = require("morgan");
 const cors = require("cors");
 const app = express();
+const Person = require("./models/person");
 app.use(express.json());
 app.use(cors());
 app.use(express.static("build"));
-app.use(
-  morgan(
-    ":method :url :status :res[content-length] - :response-time ms - :isPost"
-  )
-);
-
-morgan.token("isPost", function (req, res) {
-  if (req.method === "POST") {
-    return JSON.stringify(req.body);
-  }
-  return "n/a";
-});
 
 let persons = [
   {
@@ -42,26 +30,27 @@ let persons = [
 ];
 
 app.get("/api/persons", (req, res) => {
-  res.json(persons);
+  Person.find({}).then((persons) => {
+    res.json(persons);
+  });
 });
 
 app.get("/info", (req, res) => {
   const time = Date();
-  res.send(`
-    Phonebook has info for ${persons.length} people
-    <br/>
-    ${time}
+  return Person.find({}).then((personsArr) => {
+    res.send(`
+      Phonebook has info for ${personsArr.length} people
+      <br />
+      ${time}
     `);
+  });
 });
 
 app.get("/api/persons/:id", (req, res) => {
-  const id = +req.params.id;
-  const person = persons.find((p) => p.id === id);
-  if (person) {
+  const id = req.params.id;
+  Person.findById(id).then((person) => {
     res.json(person);
-  } else {
-    res.status(404).end();
-  }
+  });
 });
 
 app.delete("/api/persons/:id", (req, res) => {
@@ -71,7 +60,6 @@ app.delete("/api/persons/:id", (req, res) => {
 });
 
 app.post("/api/persons", (req, res) => {
-  console.log(req.method);
   const body = req.body;
   const checkName = persons.find((p) => p.name === body.name) ? true : false;
   if (!body.name || !body.number) {
@@ -85,16 +73,16 @@ app.post("/api/persons", (req, res) => {
         "name already exists in the phonebook, please use a different name",
     });
   }
-  const person = {
-    id: Math.random() * (10000 - 10) + 10,
+  const person = new Person({
     name: body.name,
     number: body.number,
-  };
-  persons = persons.concat(person);
-  res.json(person);
+  });
+  person.save().then((savedPerson) => {
+    res.json(savedPerson);
+  });
 });
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
