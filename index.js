@@ -9,7 +9,9 @@ app.use(express.static("build"));
 const errorHandler = (error, req, res, next) => {
   console.log(error);
   if (error.name === "CastError") {
-    res.status(400).send({ error: "Malformatted id" });
+    return res.status(400).send({ error: "Malformatted id" });
+  } else if (error.name === "ValidationError") {
+    return res.status(400).json({ error: error.message });
   }
   next(error);
 };
@@ -55,14 +57,14 @@ app.delete("/api/persons/:id", (req, res, next) => {
 
 app.post("/api/persons", async (req, res, next) => {
   try {
-    const body = req.body;
-    if (!body.name || !body.number) {
+    const { name, number } = req.body;
+    if (!name || !number) {
       return res.status(400).json({
         error: "name or number is missing, please fill in all required fields",
       });
     }
     let persons = await Person.find({});
-    const checkName = persons.find((p) => p.name === body.name) ? true : false;
+    const checkName = persons.find((p) => p.name === name) ? true : false;
     if (checkName) {
       return res.status(400).json({
         error:
@@ -70,8 +72,8 @@ app.post("/api/persons", async (req, res, next) => {
       });
     }
     const person = new Person({
-      name: body.name,
-      number: body.number,
+      name: name,
+      number: number,
     });
     const savedPerson = await person.save();
     res.json(savedPerson);
@@ -82,12 +84,16 @@ app.post("/api/persons", async (req, res, next) => {
 
 app.put("/api/persons/:id", (req, res, next) => {
   const id = req.params.id;
-  const body = req.body;
+  const { name, number } = req.body;
   const person = {
-    name: body.name,
-    number: body.number,
+    name: name,
+    number: number,
   };
-  Person.findByIdAndUpdate(id, person, { new: true })
+  Person.findByIdAndUpdate(id, person, {
+    new: true,
+    runValidators: true,
+    context: "query",
+  })
     .then((updatedPerson) => {
       res.json(updatedPerson);
     })
